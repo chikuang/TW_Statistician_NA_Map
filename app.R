@@ -492,6 +492,13 @@ ui <- fluidPage(
       height: auto;
       min-width: 180px;
     }
+    #main-table-wrap {
+      margin-top: 12px;
+      min-height: 520px;
+    }
+    #table .dataTables_scrollBody {
+      min-height: 460px !important;
+    }
   ")),
   titlePanel("North American Taiwanese Statistician Map"),
   sidebarLayout(
@@ -508,11 +515,18 @@ ui <- fluidPage(
       width = 10,
       leafletOutput("map", height = 650),
       br(),
-      DT::DTOutput("table"),
+      tags$div(id = "main-table-wrap", DT::DTOutput("table")),
       br(),
       tags$div(
         style = "font-size: 12px; color: #555;",
-        "Author: Chi-Kuang Yeh | Email: ",
+        "Author: ",
+        tags$a(
+          href = "https://chikuang.github.io/",
+          target = "_blank",
+          rel = "noopener noreferrer",
+          "Chi-Kuang Yeh"
+        ),
+        " | Email: ",
         tags$a(href = "mailto:chi-kuang.yeh@outlook.com", "chi-kuang.yeh@outlook.com"),
         ", ",
         tags$a(href = "mailto:cyeh@gsu.edu", "cyeh@gsu.edu"),
@@ -708,11 +722,14 @@ server <- function(input, output, session) {
       rownames = FALSE,
       escape = 1L:6L,
       selection = "none",
-      fillContainer = TRUE,
+      fillContainer = FALSE,
       options = list(
-        pageLength = 15,
+        pageLength = 20,
         scrollX = TRUE,
-        autoWidth = FALSE
+        scrollY = "460px",
+        scrollCollapse = TRUE,
+        autoWidth = FALSE,
+        deferRender = TRUE
       )
     )
   }, server = FALSE)
