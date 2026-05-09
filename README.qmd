@@ -1,10 +1,10 @@
 ---
-title: "gtDesign: Optimal designs for group testing experiments"
-subtitle: "Optimal designs for group testing experiments"
+title: "North American Taiwanese Statistician Map"
+subtitle: "Shiny × Leaflet 互動地圖（北美台灣統計學人）"
 format:
   gfm:
     toc: true
-    toc-depth: 2
+    toc-depth: 3
 execute:
   echo: true
   warning: false
@@ -15,623 +15,88 @@ date-format: "MMMM D, YYYY"
 
 [![](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
+這個存放庫是一段 **North American Taiwanese Statistician（北美台灣統計學人）** 主題的 [**Shiny**](https://shiny.posit.co/) 網頁程式：在世界地圖上以 marker 標示會員／聯絡人地理位置，並附可篩選的資料表，適合發布到自己的 **Shiny Server**、[**shinyapps.io**](https://www.shinyapps.io/)，或組織內的 [**Posit Connect**](https://posit.co/products/enterprise/connect/)。
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
 ```
 
-**Authors**
+## Overview（專案說明）
 
-Chi-Kuang Yeh (Georgia State University) 
-[![ORCID](https://img.shields.io/badge/ORCID-0000--0001--7057--2096-A6CE39?logo=orcid.png)](https://orcid.org/0000-0001-7057-2096)
+- **用途**：視覺化北美等地台灣統計相關學人或社群成員的空間分布，方便瀏覽、篩選與連結到個人檔案網頁。
+- **實作**：單檔 [`app.R`](app.R)：讀取 **Google 試算表匯出的 CSV**，以 **Leaflet** 繪製地圖、**marker cluster** 縮聚各點、**DT** 顯示可排序／分頁表格。
+- **角色圖例**（資料欄 `Role`）：例如 Professor／Student，以及數種 Alumni 類別（顏色與圖示在介面上有說明）。
 
-Weng Kee Wong (University of California, Los Angeles)
-[![ORCID](https://img.shields.io/badge/ORCID-0000--0001--5568--3054-A6CE39?logo=orcid.png)](https://orcid.org/0000-0001-5568-3054)
+## Requirements（環境）
 
-Julie Zhou (University of Victoria)
+- **R**（建議 4.2+）。
+- **R 套件**：`shiny`、`leaflet`、`dplyr`、`DT`、`readr`。
 
-<!-- badges: start -->
-[![CRAN
-status](https://www.r-pkg.org/badges/version/gtDesign)](https://CRAN.R-project.org/package=gtDesign)
-[![R-CMD-check](https://github.com/chikuang/gtDesign/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/chikuang/gtDesign/actions/workflows/R-CMD-check.yaml)
-[![](https://img.shields.io/github/languages/code-size/chikuang/gtDesign.svg)](https://github.com/chikuang/gtDesign)
-[![](https://cranlogs.r-pkg.org/badges/last-day/gtDesign?color=blue)](https://cran.r-project.org/package=gtDesign)
-[![](https://cranlogs.r-pkg.org/badges/gtDesign)](https://cran.r-project.org/package=gtDesign)
-[![CRAN download](http://cranlogs.r-pkg.org/badges/grand-total/gtDesign?color=blue)](https://cran.r-project.org/package=gtDesign)
-
-<!-- badges: end -->
-
-## Overview
-
-`gtDesign` is an R package for **locally optimal approximate designs** on a **finite candidate set** for **group testing** (pooled testing). Designs are found by **convex optimization** via **[CVXR](https://cran.r-project.org/package=CVXR)** (typically with the **CLARABEL** solver).
-
-The main application is the **Huang et al. (2020)** model for prevalence, sensitivity, and specificity with optional **cost that depends on pool size**, as used in **Yeh, Wong, and Zhou (2025)**; see [arXiv:2508.08445](https://arxiv.org/abs/2508.08445). The same interface also supports **generic nonlinear design** whenever the (approximate) information matrix is a sum of rank-one terms $\sum_i w_i h(x_i) h(x_i)^\top$.
-
-
-## Installation
-
-```{r eval=FALSE}
-# install.packages("remotes")
-remotes::install_github("chikuang/gtDesign")
+```{r deps, eval=FALSE}
+install.packages(c("shiny", "leaflet", "dplyr", "DT", "readr"))
 ```
 
-```{r eval=FALSE}
-# Alternative
-devtools::install_github("chikuang/gtDesign")
+## Data source（資料來源）
+
+應用程式啟動時會從 `app.R` 內設定的 Google Sheets CSV 公開匯出網址讀取資料。欄位需包含至少 **`Latitude`、`Longitude`**，以及 UI 用到的 **`Area`、`Role`、`First_Name`、`Last_Name`、`Profile`** 等（與現有試算表結構對齊即可）。
+
+若要改用你自己的試算表，請在 [`app.R`](app.R) 中更新 `sheet_url`，並確認 **「檔案 → 發布到網路」或同等共享設定**，讓 CSV 匯出連結可被伺服器抓取。
+
+## Run locally（本機執行）
+
+在專案根目錄（含 `app.R` 的那一層）於 R 內：
+
+```{r local, eval=FALSE}
+shiny::runApp()
 ```
 
-``` {r include = FALSE}
-# options(scipen = 999)
-options(digits = 4)
+或於終端機：
+
+```{r bash-local, eval=FALSE}
+Rscript -e "shiny::runApp('.', port = 3838)"
 ```
 
-**Requirements:** R ≥ 4.0 recommended; packages **CVXR**, **tibble**, **MASS** (see `DESCRIPTION`). A conic solver reachable by CVXR (e.g. **CLARABEL**) is required at runtime.
+然後瀏覽器開 `http://127.0.0.1:3838`（埠號以前述設定為準）。
 
-## Statistical model (Huang et al. 2020; Sec. 2 of arXiv:2508.08445)
+## Deploy to a server（部署到伺服器）
 
-Let $\theta = (p_0, p_1, p_2)$ denote **prevalence**, **sensitivity**, and **specificity**, with $p_0 \in (0,1)$ and $p_1, p_2 \in (0.5, 1]$. For a pool of size $x \in \{1,\ldots,M\}$, the **positive response probability** is
+以下為常見做法摘要；請依機構資安與 IT 規範調整。
 
-$$
-\pi(x \mid \theta) = p_1 - (p_1 + p_2 - 1)(1 - p_0)^x .
-$$
+### Posit Connect / Shiny Server
 
-**Standardized cost** (assay + enrollment) is
+1. 將此存放庫 clone 或使用 `git pull` 到伺服器。
+2. 在該目錄安裝上述套件（建議專用 **renv** 或系統 R library 一致化）。
+3. 以 **Shiny Server** 或 **Posit Connect** 的「單一 `app.R` Shiny 應用」方式掛載此目錄；Connect 通常會自動偵測 `app.R`。
 
-$$
-c(x) = 1 - q + q x, \qquad q = \frac{q_1}{q_0 + q_1} \in [0,1],
-$$
+### shinyapps.io
 
-so $q = 0$ gives **constant cost per test** ($c(x) \equiv 1$), matching the “equal cost” setting in Huang et al.
+若已安裝 **rsconnect** 並完成帳號綁定：
 
-The **Fisher information matrix** for $\theta$ under independent Bernoulli pool outcomes can be written as
-
-$$
-\mathbf{I}(\mathbf{w}, \theta) = \sum_{j=1}^{M} w_j \, \lambda(x_j) \, \mathbf{f}(x_j) \mathbf{f}(x_j)^\top,
-$$
-
-where $w_j$ are design weights on candidate pool sizes $x_j = j$, $\sum_j w_j = 1$,
-
-$$
-\lambda(x) = \frac{1}{c(x)\,\pi(x\mid\theta)\{1-\pi(x\mid\theta)\}},
-$$
-
-and $\mathbf{f}(x) = \nabla_\theta \pi(x\mid\theta)$ is the gradient of $\pi$ with respect to $\theta$ (see the paper for the explicit three components).
-
-### Regressor used in this package
-
-Many functions (`calc_Dopt`, `calc_Aopt`, `check_equivalence`, …) assume a **regression form**
-
-$$
-\mathbf{M}(\mathbf{w}) = \sum_j w_j \, \mathbf{h}(x_j) \mathbf{h}(x_j)^\top
-$$
-
-with **no separate `info_weight`**. That matches the Huang information matrix if we set
-
-$$
-\mathbf{h}(x) = \sqrt{\lambda(x)} \, \mathbf{f}(x).
-$$
-
-The function **`gt_huang2020_regressor(theta, q)`** returns the function `function(x)` that computes $\mathbf{h}(x)$. You can still use **`compute_design_SO(..., info_weight = ...)`** with raw $\mathbf{f}$ and $\lambda$ if you prefer the factored form.
-
-**Local optimality:** all designs are **local** with respect to a **nominal** $\theta^\ast$ (and fixed $q$, $M$).
-
-
-
-## Package contents (exported)
-
-| Area | Functions |
-|------|-----------|
-| Huang (2020) building blocks | `gt_huang2020_pi`, `gt_huang2020_cost`, `gt_huang2020_lambda`, `gt_huang2020_f`, `gt_huang2020_regressor` |
-| Classical approximate designs | `calc_Dopt`, `calc_Aopt`, `calc_copt` |
-| Single-objective (D, A, Ds, c, E) | `compute_design_SO` |
-| Maximin multi-objective | `maximin_design_workflow`, `compute_maximin_design`, `calc_eta_weights_maximin` |
-| Equivalence | `check_equivalence`, `check_equivalence_maximin` |
-| Plots | `plot_equivalence`, `plot_equivalence_maximin` |
-| Directional derivatives | `calc_directional_derivatives`, `calc_multi_directional_derivative` |
-## Example: D-optimal design (Table 1, M = 61, q = 0)
-
-Nominal $\theta^\ast = (0.07, 0.93, 0.96)$ as in the paper; D-optimal approximate design on $\{1,\ldots,61\}$ with $q=0$:
-
-```{r}
-library(gtDesign)
-
-theta <- c(p0 = 0.07, p1 = 0.93, p2 = 0.96)
-M <- 61L
-u <- seq_len(M)
-f <- gt_huang2020_regressor(theta, q = 0)
-
-res_d <- calc_Dopt(u, f, drop_tol = 1e-6)
-res_d$design |> round(3)
-res_d$status
-```
-
-Support points $\{1, 17, 61\}$ with weights $1/3$ each match **Table 1** (D-criterion, $q=0$) in arXiv:2508.08445.
-
-## Example: A-optimal design (same theta, q = 0)
-
-```{r}
-res_a <- calc_Aopt(u, f, drop_tol = 1e-6)
-res_a$design |> round(3)
-```
-
-## Example: Cost depending on pool size (q > 0)
-
-Larger $q$ puts more weight on enrollment in $c(x) = 1 - q + q x$. Use `f <- gt_huang2020_regressor(theta, q)` with your chosen $q \in (0,1]$.
-
-```{r}
-f_q <- gt_huang2020_regressor(theta, q = 0.2)
-res_d_q <- calc_Dopt(u, f_q, drop_tol = 1e-6)
-res_d_q$design
-```
-
-## Example: c-optimality
-
-Minimize the asymptotic variance of $\mathbf{c}^\top \hat{\theta}$ for a user-specified $\mathbf{c}$ (length 3). Example $\mathbf{c} = (0,1,1)$ as in Table 1 of the paper:
-
-```{r}
-c_vec <- c(0, 1, 1)
-res_c <- calc_copt(u, f, cVec = c_vec, drop_tol = 1e-8)
-subset(res_c$design, weight > 0.01)
-```
-
-## Example: E-optimality via `compute_design_SO`
-
-```{r}
-res_e <- compute_design_SO(
-  u = u,
-  f = f,
-  criterion = "E",
-  solver = "CLARABEL"
-)
-res_e$design
-```
-
-## Example: Equivalence theorem check (D-opt)
-
-```{r}
-eq_d <- check_equivalence(res_d, f = f, tol = 1e-4)
-eq_d$max_violation
-eq_d$all_nonpositive
-```
-
-```{r}
-#| fig-width: 7
-#| fig-height: 3.5
-#| fig-alt: Directional derivative curve for D-optimality; support points highlighted.
-plot_equivalence(eq_d, main = "D-opt: equivalence derivative")
-```
-
-## Maximin multi-objective designs
-
-The **maximin** formulation (Sec. 4 of [arXiv:2508.08445](https://arxiv.org/abs/2508.08445)) maximizes the **minimum efficiency** across several criteria. The workflow matches the regression-design package [**cvxDesign**](https://github.com/chikuang/cvxDesign) ([maximin section](https://github.com/chikuang/cvxDesign#maximin-design)): first obtain **reference losses** from single-objective optimal designs on the **same** candidate set `u` and regressor `f`, then call `compute_maximin_design()`. For group testing, `f` is typically `gt_huang2020_regressor(theta, q)`; for polynomial regression, `f` can be any `function(x)` returning a regressor vector (see cvxDesign examples).
-
-Chunks below call `library(gtDesign)`. When you edit package source and re-render this file, run **`devtools::install()`** (from the package root) first so the README runs against the installed version.
-
-**Reference losses.** Losses must be on the **same scale** as `compute_design_SO()` / internal `scalar_loss`: for **D**, the loss is $-\log\det(\mathbf{M})$ (so if you use `calc_Dopt()`, pass `D = -obj$value` because `calc_Dopt()$value` stores $\log\det(\mathbf{M})$). For **A** and **c**, `calc_Aopt()` / `calc_copt()` use the same scalar loss as `compute_design_SO()`.
-
-### Step 1: single-objective reference designs (Huang model, D + A)
-
-The chunks below reuse `u`, `f`, `res_d`, and `res_a` from the D-opt and A-opt examples.
-
-```{r}
-loss_ref <- list(
-  D = -res_d$value,
-  A = res_a$value
-)
-loss_ref
-```
-
-### Step 2: maximin design (D and A)
-
-```{r}
-res_da <- compute_maximin_design(
-  u = u,
-  f = f,
-  loss_ref = loss_ref,
-  criteria = c("D", "A")
-)
-
-res_da$design
-res_da$efficiency
-res_da$tstar
-```
-
-The **efficiencies** should be approximately **equal** at a maximin solution; **minimum efficiency** equals $1 / t^\ast$ where `tstar` is returned by the solver.
-
-### Step 3: numerical check (optional)
-
-```{r}
-tol <- 1e-4
-eq_eff <- abs(res_da$efficiency["D"] - res_da$efficiency["A"])
-eq_t   <- abs(min(res_da$efficiency) - 1 / res_da$tstar)
-eq_eff < tol && eq_t < tol
-```
-
-### Step 4: directional derivatives and $\eta$ weights (equivalence)
-
-Parameter dimension is $p = 3$ for $(p_0,p_1,p_2)$. **`calc_eta_weights_maximin`** solves a small linear program; use the **same** `f` (and `cVec` / `opts` for **c**) as in `compute_maximin_design()`. If the default solver fails, try `solver = "SCS"` and slightly relax `tol` (e.g. `1e-4`); see `?calc_eta_weights_maximin`.
-
-```{r}
-dd_da <- calc_directional_derivatives(
-  u = u,
-  M = res_da$info_matrix,
-  f = f,
-  criteria = c("D", "A")
-)
-
-eta_da <- calc_eta_weights_maximin(
-  tstar = res_da$tstar,
-  loss_ref = loss_ref,
-  loss_model = res_da$loss,
-  directional_derivatives = dd_da,
-  criteria = c("D", "A"),
-  q = 3,
-  tol = 1e-4
-)
-eta_da
-```
-
-### Step 5: equivalence check and plot
-
-```{r}
-eqm_da <- check_equivalence_maximin(
-  design_obj = res_da,
-  directional_derivatives = dd_da,
-  eta = eta_da,
-  tol = 1e-3
-)
-eqm_da$all_nonpositive
-eqm_da$support_equal_zero
-```
-
-```{r}
-plot_equivalence_maximin(
-  design_obj = res_da,
-  directional_derivatives = dd_da,
-  eta = eta_da,
-  criteria = c("D", "A")
+```{r deploy-shinyapps, eval=FALSE}
+rsconnect::deployApp(
+  appDir = ".",
+  appName = "TW_Statistician_NA_Map"  # 依帳號與命名習慣修改
 )
 ```
 
-### Wrapper function
+部署前請確認 **`sheet_url` 在雲端環境仍可存取**（試算表權限／網路限制）。
 
-``` {r wrapper}
-out <- maximin_design_workflow(
-  u = u,
-  f = f,
-  criteria = c("D", "A"),
-  make_figure = TRUE
-)
-out$maximin$efficiency
-out$maximin$value
-out$maximin$tstar
-out$maximin$design
-```
+### 注意事項
 
-### Example: D + A + c (contrast $\mathbf{c} = (0,1,1)$)
+- **HTTPS 與隱私**：地圖與外部圖磚會連到網路；若資料敏感，請改內部託管或限制存取。
+- **Google 配額**：大量重新整理可能觸發匯出頻率限制；高流量可考慮改為定期下載 CSV 到伺服器本機再讀檔。
 
-Use the same contrast as in the c-optimal example (`c_vec`). Pass `opts = list(cVec_c = c_vec)` whenever **c** is included.
+## Repository layout（目錄）
 
-```{r}
-loss_ref_dac <- list(
-  D = -res_d$value,
-  A = res_a$value,
-  c = res_c$value
-)
+| 路徑 | 說明 |
+|------|------|
+| `app.R` | Shiny UI／server、資料讀取與 Leaflet／DT |
+| `rsconnect/` | （若存在）過去發布 shinyapps.io 的設定備份 |
 
-res_dac <- compute_maximin_design(
-  u = u,
-  f = f,
-  loss_ref = loss_ref_dac,
-  criteria = c("D", "A", "c"),
-  opts = list(cVec_c = c_vec)
-)
+## Maintainer
 
-res_dac$efficiency
-```
-
-Directional derivatives, $\eta$ weights, and equivalence for three criteria (use a slightly looser tolerance on the combined derivative because of numerical slack):
-
-```{r}
-dd_dac <- calc_directional_derivatives(
-  u = u,
-  M = res_dac$info_matrix,
-  f = f,
-  criteria = c("D", "A", "c"),
-  cVec = c_vec
-)
-eta_dac <- calc_eta_weights_maximin(
-  tstar = res_dac$tstar,
-  loss_ref = loss_ref_dac,
-  loss_model = res_dac$loss,
-  directional_derivatives = dd_dac,
-  criteria = c("D", "A", "c"),
-  q = 3,
-  tol = 1e-3
-)
-check_equivalence_maximin(res_dac, dd_dac, eta_dac, tol = 0.002)$all_nonpositive
-```
-
-```{r}
-plot_equivalence_maximin(
-  res_dac,
-  dd_dac,
-  eta_dac,
-  criteria = c("D", "A", "c")
-)
-```
-
-## Tables and Figures in the paper
-
-### Table 1
-
-
-``` {r table1}
-library(dplyr)
-library(knitr)
-
-theta <- c(p0 = 0.07, p1 = 0.93, p2 = 0.96)
-u <- 1:61
-q_val <- 0.8
-f_q0 <- gt_huang2020_regressor(theta, q = q_val)
-
-make_summary <- function(design, criterion) {
-  design |>
-    filter(weight > 1e-4) |>
-    select(1, 2) |>
-    rename(group_size = 1, weight = 2) |>
-    mutate(weight = round(weight, 3)) |>
-    summarise(
-      Criterion = criterion,
-      `Support points` = paste(group_size, collapse = ", "),
-      Weights = paste(weight, collapse = ", ")
-    )
-}
-
-tab_summary <- bind_rows(
-  make_summary(calc_Dopt(u, f_q0)$design, "D-opt"),
-  make_summary(calc_Aopt(u, f_q0)$design, "A-opt"),
-  make_summary(calc_copt(u, f_q0, cVec = c(1, 0, 0))$design, "D_s-opt"),
-  make_summary(calc_copt(u, f_q0, cVec = c(0, 1, 1))$design, "c-opt")
-)
-
-knitr::kable(
-  tab_summary,
-  format = "pipe",
-  caption = paste0(
-    "Support points and weights for approximate optimal designs ",
-    "for the Huang (2020) group testing model with q = ", q_val,
-    " on the design space {", min(u), ", ..., ", max(u), "}."
-  )
-)
-```
-
-
-### Table 2
-
-``` {r table2}
-
-u <- seq_len(150L)
-f_q <- gt_huang2020_regressor(theta, q = 0.0)
-res_d_q <- calc_Dopt(u, f_q, drop_tol = 1e-6)
-res_a_q <- calc_Aopt(u, f_q, drop_tol = 1e-6)
-loss_ref <- list(
-  D = -res_d_q$value,
-  A = res_a_q$value
-)
-loss_ref
-
-### Step 2: maximin design (D and A)
-
-res_da <- compute_maximin_design(
-  u = u,
-  f = f_q,
-  loss_ref = loss_ref,
-  criteria = c("D", "A")
-)
-
-res_da$design
-res_da$efficiency
-res_da$tstar
-
-### Step 3 numerical check
-tol <- 1e-4
-eq_eff <- abs(res_da$efficiency["D"] - res_da$efficiency["A"])
-eq_t   <- abs(min(res_da$efficiency) - 1 / res_da$tstar)
-eq_eff < tol && eq_t < tol
-```
-
-### Figure 2
-
-
-``` {r Figure 2}
-u <- seq_len(150L)
-cVec <- c(1, 0, 0)
-theta = c(0.07, 0.93, 0.96)
-f_q <- gt_huang2020_regressor(theta, q = 0.2)
-out <- maximin_design_workflow(
-  u = u,
-  f = f_q,
-  criteria = c("D", "A", "c"),
-  opts = list(cVec_c = cVec),
-  make_figure = TRUE
-)
-out$maximin$efficiency
-out$maximin$value
-out$maximin$tstar
-out$maximin$design
-```
-
-### Table 3 (exact design via budget rounding, D-optimality)
-
-Rounding Algorithm II in Sec. 5.1: approximate D-opt on `u`, then [round_gt_design_budget()] for each total cost `C`. Re-run for `C \in \{100, 500, 10000\}` (or as in the paper table).
-
-``` {r table3}
-theta <- c(p0 = 0.07, p1 = 0.93, p2 = 0.96)
-u <- seq_len(150L)
-q_cost <- 0.2
-f <- gt_huang2020_regressor(theta, q_cost)
-
-# calculate the approximate design
-res_D <- calc_Dopt(u, f, drop_tol = 1e-6)
-
-# Example: C = 100 (repeat for C = 500, 10000, ...)
-out <- round_gt_design_budget(
-  approx_design = res_D,
-  u = u,
-  theta = theta,
-  C = 100,
-  q_cost = q_cost,
-  criterion = "D",
-  fix_zero_floor = FALSE
-)
-out$C_remaining
-out$design_exact  
-out$efficiency    
-out$design_round1
-out$delta
-# 8*(1 - q_cost + q_cost*1 ) # 8 
-# 2*(1 - q_cost + q_cost*10) # 5.6
-# 
-# my_cost <- 0
-# for (i in 1:ncol(out$design_round1)) {
-#   my_cost <- out$design_round1[2, i] * (1 - q_cost + q_cost*out$design_round1[1,i]) + my_cost
-# }
-
-```
-
-### Table 4 (maximin exact designs, arXiv Sec. 5.2)
-
-Table 4 reports **exact** designs $\xi_{RAC}$ from the rounding algorithms applied to **maximin** approximate designs on $M=61$, $\boldsymbol{\theta}^*=(0.07,0.93,0.96)$. **MinEff** is $\min_j \mathrm{Eff}_j$ at $\xi_{RAC}$; **$1/t^*$** is the minimum efficiency of the maximin OAD (Table 2). Part (i) uses **fixed run count** $n$ with $q=0$ (Rounding Algorithm I); part (ii) uses **budget** $C$ with $q=0.2$ (Rounding Algorithm II). The helper functions [round_gt_design_n_maximin()] and [round_gt_design_budget_maximin()] provide reusable implementations for these two settings.
-
-Example below shows **one Table 4 row**: DD-AA, $q=0.2$, $C=100$. It should return $x=(1,10,59,61)$, $n=(26,8,1,3)$, and MinEff $\approx 0.932$.
-
-```{r table4-one-row}
-theta <- c(p0 = 0.07, p1 = 0.93, p2 = 0.96)
-u <- seq_len(61L)
-q_cost <- 0.2
-f <- gt_huang2020_regressor(theta, q_cost)
-
-# single-objective references used in maximin efficiencies
-res_d <- calc_Dopt(u, f, drop_tol = 1e-6)
-res_a <- calc_Aopt(u, f, drop_tol = 1e-6)
-loss_da <- list(D = -res_d$value, A = res_a$value)
-
-# maximin approximate design (D-A)
-mm_da <- compute_maximin_design(
-  u = u,
-  f = f,
-  loss_ref = loss_da,
-  criteria = c("D", "A"),
-  drop_tol = 1e-6
-)
-
-# exact design at C = 100 using Algorithm II + modified Step II (MinEff search)
-out_da_100 <- round_gt_design_budget_maximin(
-  approx_design = mm_da,
-  u = u,
-  theta = theta,
-  C = 100,
-  q_cost = q_cost,
-  loss_ref = loss_da,
-  criteria = c("D", "A")
-)
-
-out_da_100$design_exact
-out_da_100$delta
-out_da_100$min_efficiency
-1 / mm_da$tstar
-```
-
-The full chunk below is set to `eval=FALSE` so the README renders quickly; set `eval=TRUE` to run all Table 4 rows.
-
-```{r table4, eval=FALSE}
-theta <- c(p0 = 0.07, p1 = 0.93, p2 = 0.96)
-u <- seq_len(61L)
-q_cost <- 0.2
-f <- gt_huang2020_regressor(theta, q_cost)
-
-res_d <- calc_Dopt(u, f, drop_tol = 1e-6)
-res_a <- calc_Aopt(u, f, drop_tol = 1e-6)
-loss_da <- list(D = -res_d$value, A = res_a$value)
-
-mm_da <- compute_maximin_design(
-  u = u,
-  f = f,
-  loss_ref = loss_da,
-  criteria = c("D", "A"),
-  drop_tol = 1e-6
-)
-min(mm_da$efficiency)   # compare to 1/t* in Table 4
-1 / mm_da$tstar
-
-for (C in c(100, 500)) {
-  out_da <- round_gt_design_budget(
-    mm_da,
-    u = u,
-    theta = theta,
-    C = C,
-    q_cost = q_cost,
-    criterion = "D"
-  )
-  ed_da <- exact_design_efficiency_maximin(
-    out_da$M_exact,
-    loss_da,
-    c("D", "A")
-  )
-  list(C = C, design_exact = out_da$design_exact, min_eff = ed_da$min_efficiency)
-}
-
-res_ds <- calc_copt(u, f, cVec = c(1, 0, 0), drop_tol = 1e-6)
-loss_dads <- list(D = -res_d$value, A = res_a$value, Ds = res_ds$value)
-opts_ds <- list(cVec_Ds = c(1, 0, 0))
-
-mm_dads <- compute_maximin_design(
-  u = u,
-  f = f,
-  loss_ref = loss_dads,
-  criteria = c("D", "A", "Ds"),
-  opts = opts_ds,
-  drop_tol = 1e-6
-)
-
-for (C in c(100, 500)) {
-  out_3 <- round_gt_design_budget(
-    mm_dads,
-    u = u,
-    theta = theta,
-    C = C,
-    q_cost = q_cost,
-    criterion = "D",
-    opts = opts_ds
-  )
-  ed_3 <- exact_design_efficiency_maximin(
-    out_3$M_exact,
-    loss_dads,
-    c("D", "A", "Ds"),
-    opts = opts_ds
-  )
-  list(C = C, design_exact = out_3$design_exact, min_eff = ed_3$min_efficiency)
-}
-```
-
-Numerical values may differ slightly from the paper due to the CVXR solver and the extension step in [round_gt_design_budget()] (single-criterion merge for Step II).
-
-## References
-
-1. Yeh, C.-K., Wong, W. K., Zhou, J. (2025). Single and multi-objective optimal designs for group testing experiments. *arXiv* 2508.08445. <https://doi.org/10.48550/arXiv.2508.08445>
-
-2. Huang, S.-Y., Chen, Y.-H., Wang, W. (2020). Optimal group testing designs for estimating prevalence with imperfect tests. *Journal of the Royal Statistical Society Series C*.
-
-3. Pukelsheim, F. (2006). *Optimal Design of Experiments*. SIAM.
-
-4. Fedorov, V. V. (1972). *Theory of Optimal Experiments*. Academic Press.
+**Chi-Kuang Yeh** · 聯絡方式見應用程式頁尾（或可於 `app.R` 內調整信箱與署名）。
 
 ## License
 
-GPL-3 — see the `License` field in `DESCRIPTION`.
-
-## TODO
-
-- [ ] Finish up the package documentation and vignettes.
-- [ ] Add the rounding algorithms to obtain the optimal exact designs
+與存放庫內 **`LICENSE`** 一致：**GPL-3**。
