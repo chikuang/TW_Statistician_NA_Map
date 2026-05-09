@@ -1,0 +1,13 @@
+name: UWaterloo_SAS_Researcher_Map
+title:
+username: chikuang
+account: chikuang
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 14903175
+bundleId: 10421748
+url: https://chikuang.shinyapps.io/UWaterloo_SAS_Researcher_Map/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: backup/app_Jun8.R|LICENSE|README.md
