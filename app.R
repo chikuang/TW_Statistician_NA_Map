@@ -502,11 +502,6 @@ ui <- fluidPage(
         label = "Title:",
         choices = c("All", titles_for_filter),
         selected = "All"
-      ),
-      tags$small(
-        id = "geo_status_note",
-        style = "margin-top:8px;display:block;line-height:1.35;color:#374151;",
-        textOutput("geo_status_out")
       )
     ),
     mainPanel(
@@ -585,39 +580,6 @@ server <- function(input, output, session) {
         invalidateLater(GEOCODE_THROTTLE_MS, session)
       }
     })
-  })
-
-  output$geo_status_out <- renderText({
-    fd <- faculty_data()
-    n <- length(geo_remain())
-    pins <- sum(!is.na(fd$latitude) & !is.na(fd$longitude), na.rm = TRUE)
-    rows <- nrow(fd)
-    if (n > 0L) {
-      paste0(
-        "Photon 地理編碼進行中：尚約 ",
-        n,
-        " 所機構（約 ",
-        GEOCODE_THROTTLE_SEC,
-        " s／所）；標記會陸續出現。\n目前有座標 ",
-        pins,
-        " / ",
-        rows,
-        " 筆。\n若想在開 App 前就全部跑完，請設環境變數 SHINY_GEOCODE_BLOCKING_START=TRUE。"
-      )
-    } else {
-      paste0(
-        if (length(GEO_QUEUE_START) > 0L) {
-          "機構座標已取得（或由試算表填入）。Photon 隊列已結束。\n"
-        } else {
-          "背景地理編碼目前無排隊項目。\n"
-        },
-        "目前有座標 ",
-        pins,
-        " / ",
-        rows,
-        " 筆。"
-      )
-    }
   })
 
   filtered_data <- reactive({
