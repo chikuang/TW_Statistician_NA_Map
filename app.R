@@ -513,7 +513,9 @@ ui <- fluidPage(
       tags$div(
         style = "font-size: 12px; color: #555;",
         "Author: Chi-Kuang Yeh | Email: ",
-        tags$a(href = "mailto:chi-kuang.yeh@mail.mcgill.ca", "chi-kuang.yeh@mail.mcgill.ca"),
+        tags$a(href = "mailto:chi-kuang.yeh@outlook.com", "chi-kuang.yeh@outlook.com"),
+        ", ",
+        tags$a(href = "mailto:cyeh@gsu.edu", "cyeh@gsu.edu"),
         tags$br(),
         paste("Last updated:", format(Sys.Date(), "%B %d, %Y")),
         tags$hr(),
