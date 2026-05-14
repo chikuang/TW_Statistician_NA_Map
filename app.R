@@ -340,7 +340,8 @@ FACULTY_SHEET <- tibble(
   longitude = suppressWarnings(as.numeric(safe_chr(fr, c("Longitude", "longitude"), n_fr)))
 ) |>
   mutate(
-    title = ifelse(title == "", "Other", trimws(title))
+    title = ifelse(title == "", "Industry", trimws(title)),
+    title = ifelse(tolower(trimws(title)) == "other", "Industry", title)
   )
 
 GEO_QUEUE_START <- pending_geocode_affiliations(FACULTY_SHEET, GEOCODE_CACHE_FILE)
@@ -380,19 +381,35 @@ cluster_opts <- markerClusterOptions(
   spiderfyOnMaxZoom = TRUE
 )
 
-# Title → marker color/icon (aligned with spreadsheet Title dropdown categories)
+# Title → marker color/icon on the **map** (legend / layer control).
+# Professor-track ranks share the same marker + layer name "Professor" so pins at the
+# same address are not split across competing icons; popups still show the sheet Title.
+PROFESSOR_FAMILY_KEYS <- c(
+  "professor",
+  "assistant professor",
+  "associate professor",
+  "research associate professor"
+)
+
 title_marker_spec <- list(
   "Professor" = list(markerColor = "red", icon = "graduation-cap"),
-  "Associate Professor" = list(markerColor = "blue", icon = "graduation-cap"),
-  "Assistant Professor" = list(markerColor = "cadetblue", icon = "graduation-cap"),
   "Emeritus" = list(markerColor = "gray", icon = "black-tie"),
   "In Memory" = list(markerColor = "darkpurple", icon = "star"),
-  "Other" = list(markerColor = "beige", icon = "user")
+  "Industry" = list(markerColor = "beige", icon = "user")
 )
+
+map_leaflet_group_vec <- function(title) {
+  t <- trimws(as.character(title))
+  key <- tolower(t)
+  prof <- key %in% PROFESSOR_FAMILY_KEYS
+  known <- names(title_marker_spec)
+  in_spec <- t %in% known
+  ifelse(prof, "Professor", ifelse(in_spec, t, "Industry"))
+}
 
 icon_for_title <- function(t) {
   spec <- title_marker_spec[[t]]
-  if (is.null(spec)) spec <- title_marker_spec[["Other"]]
+  if (is.null(spec)) spec <- title_marker_spec[["Industry"]]
   makeAwesomeIcon(spec$icon, markerColor = spec$markerColor, library = "fa")
 }
 
@@ -655,6 +672,9 @@ server <- function(input, output, session) {
     proxy |> clearMarkers() |> clearMarkerClusters() |> clearControls()
 
     if (nrow(df) > 0) {
+      df <- df |>
+        dplyr::mutate(leaflet_group = map_leaflet_group_vec(.data$title))
+
       pops <- popup_body(
         df$first_name, df$last_name, df$chinese_name, df$email, df$affiliation,
         df$dept_school, df$title, df$google_scholar, df$website
@@ -666,21 +686,28 @@ server <- function(input, output, session) {
         paste(trimws(paste(df$first_name, df$last_name)), cn_lab),
         trimws(paste(df$first_name, df$last_name))
       )
-      labels_full <- paste0(labels_base, "\n(", df$title, ")")
+      aff_lab <- trimws(as.character(df$affiliation))
+      aff_lab[is.na(aff_lab)] <- ""
+      labels_full <- ifelse(
+        nzchar(aff_lab),
+        paste0(labels_base, "\n(", aff_lab, ")"),
+        labels_base
+      )
 
-      for (t in sort(unique(df$title))) {
-        sub <- df[df$title == t, , drop = FALSE]
-        ps <- pops[df$title == t]
-        lb <- labels_full[df$title == t]
+      groups_shown <- sort(unique(df$leaflet_group))
+      for (g in groups_shown) {
+        sub <- df[df$leaflet_group == g, , drop = FALSE]
+        ps <- pops[df$leaflet_group == g]
+        lb <- labels_full[df$leaflet_group == g]
 
         proxy |> addAwesomeMarkers(
           data = sub,
           lng = sub$longitude,
           lat = sub$latitude,
-          icon = icon_for_title(t),
+          icon = icon_for_title(g),
           label = lb,
           popup = ps,
-          group = t,
+          group = g,
           clusterOptions = cluster_opts,
           labelOptions = labelOptions(
             textsize = "12px",
@@ -690,21 +717,20 @@ server <- function(input, output, session) {
         )
       }
 
-      # Legend (titles that appear at least once in current filter)
+      # Legend (one entry per map layer / marker category)
       leg_items <- ""
-      titles_shown <- sort(unique(df$title))
-      cols <- vapply(titles_shown, function(ti) {
+      cols <- vapply(groups_shown, function(ti) {
         s <- title_marker_spec[[ti]]
-        if (is.null(s)) s <- title_marker_spec[["Other"]]
+        if (is.null(s)) s <- title_marker_spec[["Industry"]]
         s$markerColor
       }, character(1))
-      for (i in seq_along(titles_shown)) {
+      for (i in seq_along(groups_shown)) {
         leg_items <- paste0(
           leg_items,
           "<i class=\"fa fa-map-marker\" style=\"color:",
           cols[i],
           "; margin-right: 6px;\"></i> ",
-          htmltools::htmlEscape(titles_shown[i]), "<br>"
+          htmltools::htmlEscape(groups_shown[i]), "<br>"
         )
       }
       legend_html <- HTML(paste0(
@@ -713,9 +739,8 @@ server <- function(input, output, session) {
         "</div>"
       ))
 
-      overlay <- unique(df$title)
       proxy |> addLayersControl(
-        overlayGroups = overlay,
+        overlayGroups = groups_shown,
         options = layersControlOptions(collapsed = FALSE)
       )
       proxy |> addControl(legend_html, position = "bottomright")
