@@ -37,7 +37,7 @@ GEOCODE_BLOCKING_AT_START <- isTRUE(as.logical(Sys.getenv(
 
 SHEET_DOCUMENT_ID <- Sys.getenv(
   "SHINY_GOOGLE_SHEET_ID",
-  unset = "1eU9ZiaqseSyhwOJuRVyyFVA_yQmtrhtfysUyijPky30"
+  unset = "1HM8ThNsVrjIRVFhDjwxvs41Tu-ti7C0xUm2PlcLLRxE"
 )
 SHEET_GID <- Sys.getenv("SHINY_GOOGLE_SHEET_GID", unset = "0")
 
@@ -324,6 +324,11 @@ n_fr <- nrow(fr)
 FACULTY_SHEET <- tibble(
   first_name = safe_chr(fr, c("First name", "First_name", "FIRST NAME"), n_fr),
   last_name = safe_chr(fr, c("Last Name", "Last_name", "LAST NAME"), n_fr),
+  chinese_name = safe_chr(
+    fr,
+    c("Chinese Name", "Chinese name", "CHINESE NAME", "Chinese_Name", "中文姓名", "中文名"),
+    n_fr
+  ),
   email = safe_chr(fr, "Email", n_fr),
   # Common typo: "Affliation" (missing i) — spellings & case-insensitive match in safe_chr()
   affiliation = safe_chr(fr, c("Affiliation", "Affliation", "Institution"), n_fr),
@@ -446,9 +451,21 @@ dt_link_anchor <- function(x, anchor_label) {
 }
 
 popup_body <- Vectorize(
-  function(first_name, last_name, email, affiliation, dept_school, title,
+  function(first_name, last_name, chinese_name, email, affiliation, dept_school, title,
            google_scholar, website) {
-    tn <- escape_txt(trimws(paste(first_name, last_name)))
+    en <- trimws(paste(first_name, last_name))
+    cn <- trimws(as.character(chinese_name %||% ""))
+    tn <- if (nzchar(cn)) {
+      paste0(
+        "<big><strong>",
+        escape_txt(en),
+        " <span lang=\"zh-Hant\" style=\"font-weight:600;\">",
+        escape_txt(cn),
+        "</span></strong></big>"
+      )
+    } else {
+      paste0("<big><strong>", escape_txt(en), "</strong></big>")
+    }
     em_raw <- trimws(as.character(email %||% ""))
     mail <- ""
     if (em_raw != "")
@@ -460,7 +477,7 @@ popup_body <- Vectorize(
     web_l <- href_if(website, "Website")
     links <- paste(collapse = " · ", Filter(nzchar, c(mail, scholar_l, web_l)))
     paste0(
-      "<big><strong>", tn, "</strong></big>",
+      tn,
       "<br><span style=\"color:#374151;\"><strong>Title · 職位:</strong> ",
       escape_txt(title), "</span>",
       ifelse(nchar(escape_txt(dept_school)),
@@ -478,7 +495,7 @@ popup_body <- Vectorize(
   },
   USE.NAMES = FALSE,
   vectorize.args = c(
-    "first_name", "last_name", "email", "affiliation",
+    "first_name", "last_name", "chinese_name", "email", "affiliation",
     "dept_school", "title", "google_scholar", "website"
   )
 )
@@ -639,15 +656,17 @@ server <- function(input, output, session) {
 
     if (nrow(df) > 0) {
       pops <- popup_body(
-        df$first_name, df$last_name, df$email, df$affiliation,
+        df$first_name, df$last_name, df$chinese_name, df$email, df$affiliation,
         df$dept_school, df$title, df$google_scholar, df$website
       )
-      labels_full <- paste0(
-        trimws(paste(df$first_name, df$last_name)),
-        "\n(",
-        df$title,
-        ")"
+      cn_lab <- trimws(as.character(df$chinese_name))
+      cn_lab[is.na(cn_lab)] <- ""
+      labels_base <- ifelse(
+        nzchar(cn_lab),
+        paste(trimws(paste(df$first_name, df$last_name)), cn_lab),
+        trimws(paste(df$first_name, df$last_name))
       )
+      labels_full <- paste0(labels_base, "\n(", df$title, ")")
 
       for (t in sort(unique(df$title))) {
         sub <- df[df$title == t, , drop = FALSE]
@@ -709,6 +728,7 @@ server <- function(input, output, session) {
       dplyr::transmute(
         `Last Name` = dt_chr(.data$last_name),
         `First name` = dt_chr(.data$first_name),
+        `Chinese Name` = dt_chr(.data$chinese_name),
         Email = dt_chr(.data$email),
         Affiliation = dt_chr(.data$affiliation),
         Title = dt_chr(.data$title),
@@ -720,7 +740,7 @@ server <- function(input, output, session) {
     DT::datatable(
       tab,
       rownames = FALSE,
-      escape = 1L:6L,
+      escape = 1L:7L,
       selection = "none",
       fillContainer = FALSE,
       options = list(
