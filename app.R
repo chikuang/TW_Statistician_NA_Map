@@ -413,6 +413,31 @@ icon_for_title <- function(t) {
   makeAwesomeIcon(spec$icon, markerColor = spec$markerColor, library = "fa")
 }
 
+# Legend swatches: same sprite/CSS as map markers; table layout keeps icon + label aligned.
+legend_awesome_row_html <- function(leaflet_group) {
+  spec <- title_marker_spec[[leaflet_group]]
+  if (is.null(spec)) spec <- title_marker_spec[["Industry"]]
+  mc <- spec$markerColor
+  ic <- spec$icon
+  paste0(
+    '<div style="display:table;width:100%;margin-bottom:8px;border-collapse:collapse;">',
+    '<div style="display:table-row;">',
+    '<div style="display:table-cell;vertical-align:middle;width:44px;padding:0 10px 0 0;text-align:center;">',
+    '<div style="position:relative;width:40px;height:44px;margin:0 auto;">',
+    '<div class="awesome-marker awesome-marker-icon-',
+    mc,
+    '" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.38);transform-origin:center center;">',
+    '<i class="fa fa-',
+    ic,
+    ' fa-inverse" style="margin-top:10px;display:inline-block;font-size:14px;"></i>',
+    "</div></div></div>",
+    '<div style="display:table-cell;vertical-align:middle;font-size:13px;line-height:1.35;color:#333;">',
+    htmltools::htmlEscape(leaflet_group),
+    "</div>",
+    "</div></div>"
+  )
+}
+
 titles_for_filter <- FACULTY_SHEET |>
   pull(title) |>
   unique() |>
@@ -519,12 +544,37 @@ popup_body <- Vectorize(
 
 # UI
 ui <- fluidPage(
+  tags$head(
+    tags$script(
+      HTML("
+$(document).on('shiny:connected', function() {
+  if (window.__natmapResetDtBound) return;
+  window.__natmapResetDtBound = true;
+  Shiny.addCustomMessageHandler('natmap_reset_dt', function(msg) {
+    if (typeof $ === 'undefined' || !$.fn.dataTable) return;
+    var $tbl = $('#table').find('table.dataTable');
+    if ($tbl.length && $.fn.dataTable.isDataTable($tbl[0])) {
+      var api = $tbl.DataTable();
+      api.search('');
+      api.columns().search('');
+      api.order([]);
+      api.page('first').draw(false);
+    }
+  });
+});
+")
+    )
+  ),
   tags$style(HTML("
     #title_filt {
       font-size: 12px;
       padding: 4px;
       height: auto;
       min-width: 180px;
+    }
+    #reset_filters {
+      width: 100%;
+      margin-top: 10px;
     }
     #main-table-wrap {
       margin-top: 12px;
@@ -543,6 +593,11 @@ ui <- fluidPage(
         label = "Title:",
         choices = c("All", titles_for_filter),
         selected = "All"
+      ),
+      actionButton(
+        "reset_filters",
+        "Reset Filters",
+        class = "btn-secondary btn-sm"
       )
     ),
     mainPanel(
@@ -588,6 +643,11 @@ server <- function(input, output, session) {
   faculty_data <- reactiveVal(faculty_tbl_initial)
 
   geo_remain <- reactiveVal(GEO_QUEUE_BACKGROUND)
+
+  observeEvent(input$reset_filters, {
+    updateSelectInput(session, "title_filt", selected = "All")
+    session$sendCustomMessage(type = "natmap_reset_dt", list())
+  }, ignoreInit = TRUE)
 
   # Photon queue on Shiny’s own timer (`invalidateLater`), not `later::later`.
   # (`later` on shinyapps.io can desync WebSockets and disconnect sessions.)
@@ -717,22 +777,11 @@ server <- function(input, output, session) {
         )
       }
 
-      # Legend (one entry per map layer / marker category)
-      leg_items <- ""
-      cols <- vapply(groups_shown, function(ti) {
-        s <- title_marker_spec[[ti]]
-        if (is.null(s)) s <- title_marker_spec[["Industry"]]
-        s$markerColor
-      }, character(1))
-      for (i in seq_along(groups_shown)) {
-        leg_items <- paste0(
-          leg_items,
-          "<i class=\"fa fa-map-marker\" style=\"color:",
-          cols[i],
-          "; margin-right: 6px;\"></i> ",
-          htmltools::htmlEscape(groups_shown[i]), "<br>"
-        )
-      }
+      # Legend: mini awesome-marker pins (same sprite/CSS as map markers)
+      leg_items <- paste0(
+        vapply(groups_shown, legend_awesome_row_html, character(1L)),
+        collapse = ""
+      )
       legend_html <- HTML(paste0(
         "<div style=\"background:white;padding:10px;border-radius:6px;font-size:13px;line-height:1.45;\"><b>Legend (Title)</b><br>",
         leg_items,
