@@ -388,7 +388,9 @@ PROFESSOR_FAMILY_KEYS <- c(
   "professor",
   "assistant professor",
   "associate professor",
-  "research associate professor"
+  "research associate professor",
+  "research assistant professor",
+  "assistant research professor"
 )
 
 title_marker_spec <- list(
@@ -400,7 +402,7 @@ title_marker_spec <- list(
 
 map_leaflet_group_vec <- function(title) {
   t <- trimws(as.character(title))
-  key <- tolower(t)
+  key <- tolower(gsub("\\s+", " ", trimws(t)))
   prof <- key %in% PROFESSOR_FAMILY_KEYS
   known <- names(title_marker_spec)
   in_spec <- t %in% known
